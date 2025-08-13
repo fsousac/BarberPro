@@ -24,12 +24,8 @@ lerna-debug.log*
 .tmp
 
 # compiled output
-/dist
-*/dist
-*/*/dist
-/node_modules
-*/node_modules
-*/*/node_modules
+**/dist
+**/node_modules
 */build
 
 # Logs
@@ -83,3 +79,5 @@ pids
 
 # Diagnostic reports (https://nodejs.org/api/report.html)
 report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+**/migrations
+prisma/.db/
