@@ -1,0 +1,144 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     Membership[]
+  services  Service[]
+  staff     Staff[]
+  hours     WorkingHours[]
+  timeOffs  TimeOff[]
+  appts     Appointment[]
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  passwordHash String
+  name         String
+  phone        String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  memberships  Membership[]
+  devices      DeviceToken[]
+  appts        Appointment[] @relation("ClientAppointments")
+}
+
+model Membership {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      Role
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@unique([tenantId, userId])
+}
+
+enum Role { OWNER STAFF RECEPTIONIST }
+
+model Service {
+  id         String   @id @default(cuid())
+  tenantId   String
+  name       String
+  duration   Int      // minutos
+  priceCents Int
+  active     Boolean  @default(true)
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  staffLink  StaffService[]
+}
+
+model Staff {
+  id        String   @id @default(cuid())
+  tenantId  String
+  userId    String?  // opcional: staff pode ter login
+  name      String
+  active    Boolean  @default(true)
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  services  StaffService[]
+  appts     Appointment[] @relation("StaffAppointments")
+}
+
+model StaffService {
+  id         String  @id @default(cuid())
+  tenantId   String
+  staffId    String
+  serviceId  String
+  priceCents Int?
+  duration   Int?    // override
+
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  staff    Staff   @relation(fields: [staffId], references: [id])
+  service  Service @relation(fields: [serviceId], references: [id])
+
+  @@unique([staffId, serviceId])
+}
+
+model WorkingHours {
+  id        String   @id @default(cuid())
+  tenantId  String
+  staffId   String?  // null => horas gerais da loja
+  weekday   Int      // 0=Dom, 6=Sáb
+  startMin  Int      // minutos desde 00:00
+  endMin    Int
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  staff     Staff?   @relation(fields: [staffId], references: [id])
+}
+
+model TimeOff {
+  id        String   @id @default(cuid())
+  tenantId  String
+  staffId   String?
+  startsAt  DateTime
+  endsAt    DateTime
+  reason    String?
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  staff     Staff?   @relation(fields: [staffId], references: [id])
+}
+
+model Appointment {
+  id          String     @id @default(cuid())
+  tenantId    String
+  clientId    String
+  staffId     String
+  serviceId   String
+  startsAt    DateTime
+  endsAt      DateTime
+  status      ApptStatus @default(PENDING)
+  notes       String?
+
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  client    User    @relation("ClientAppointments", fields: [clientId], references: [id])
+  staff     Staff   @relation("StaffAppointments", fields: [staffId], references: [id])
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  @@index([tenantId, staffId, startsAt])
+  @@unique([tenantId, staffId, startsAt])
+}
+
+enum ApptStatus { PENDING CONFIRMED CANCELLED NO_SHOW COMPLETED }
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  String   // ios|android
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
